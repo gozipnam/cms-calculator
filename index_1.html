@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CMS 비용 계산기</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
+    background: #f5f4f0;
+    color: #1a1a1a;
+    line-height: 1.6;
+    padding: 32px 16px 64px;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  header { margin-bottom: 28px; }
+  h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
+  header p { font-size: 14px; color: #6b6a66; margin-top: 4px; }
+  .card {
+    background: #ffffff;
+    border: 1px solid #e3e1da;
+    border-radius: 14px;
+    padding: 22px 24px;
+    margin-bottom: 14px;
+  }
+  .card h2 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  .card .sub { font-size: 13px; color: #8a887f; margin-bottom: 18px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+  }
+  label { font-size: 13px; color: #6b6a66; display: block; margin-bottom: 5px; }
+  input, textarea {
+    width: 100%;
+    border: 1px solid #d6d4cc;
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 15px;
+    font-family: inherit;
+    background: #fdfdfc;
+    transition: border-color 0.15s;
+  }
+  input:focus, textarea:focus { outline: none; border-color: #2f6fde; box-shadow: 0 0 0 3px rgba(47,111,222,0.12); }
+  input.date { text-align: center; }
+  .readonly {
+    width: 100%;
+    border: 1px dashed #d6d4cc;
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 15px;
+    text-align: center;
+    background: #f2f1ec;
+    color: #55534d;
+  }
+  input.money { text-align: right; }
+  .basis {
+    background: #f4f7fd;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #33517e;
+    margin-top: 14px;
+  }
+  .breakdown {
+    border-top: 1px solid #ece9e1;
+    margin-top: 16px;
+    padding-top: 14px;
+  }
+  .breakdown p { font-size: 13px; color: #6b6a66; margin-bottom: 4px; }
+  .sum-row { display: flex; align-items: baseline; margin-top: 8px; }
+  .sum-row .label { font-size: 13px; color: #6b6a66; }
+  .sum-row .value { font-size: 21px; font-weight: 600; margin-left: auto; letter-spacing: -0.01em; }
+  .total-card {
+    background: #1f2a3d;
+    color: #ffffff;
+    border: none;
+    display: flex;
+    align-items: baseline;
+  }
+  .total-card .label { font-size: 15px; font-weight: 500; }
+  .total-card .value { font-size: 28px; font-weight: 700; margin-left: auto; letter-spacing: -0.01em; }
+  details { margin-bottom: 14px; }
+  summary { font-size: 13px; color: #6b6a66; cursor: pointer; padding: 6px 2px; }
+  summary:hover { color: #1a1a1a; }
+  textarea { font-family: 'Consolas', 'Courier New', monospace; font-size: 13px; margin-top: 8px; resize: vertical; }
+  .hint { font-size: 12px; color: #a5a29a; margin-top: 6px; }
+  .err { font-size: 13px; color: #c0392b; margin-top: 8px; display: none; }
+  footer { font-size: 12px; color: #a5a29a; text-align: center; margin-top: 28px; }
+  @media (max-width: 480px) {
+    body { padding: 20px 12px 48px; }
+    .card { padding: 18px 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>CMS 비용 계산기</h1>
+    <p>이용 시작일(오픈일)만 입력하면 정산 마감일이 자동 결정됩니다. 15일 이하 오픈은 다음 달 15일, 16일 이후 오픈은 다다음 달 15일 기준.</p>
+  </header>
+
+  <div class="card">
+    <div class="grid">
+      <div>
+        <label for="store-name">지점명</label>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:15px; white-space:nowrap;">앤딩스터디카페</span>
+          <input type="text" id="store-name" value="송파역" placeholder="예: 송파역" style="text-align:center;">
+          <span style="font-size:15px; white-space:nowrap;">점</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>콜센터 비용</h2>
+    <p class="sub">이용 시작일 ~ 전월 15일까지 영업일(토·일·공휴일 제외) 일할 + 한 달 비용(16일~익월 15일) · 일할 금액은 한 달 비용을 초과하지 않음</p>
+    <div class="grid">
+      <div>
+        <label for="cc-start">이용 시작일 (YY-MM-DD)</label>
+        <input type="text" class="date" id="cc-start" value="26-07-03" placeholder="26-07-03">
+      </div>
+      <div>
+        <label>정산 마감일 (자동)</label>
+        <div class="readonly" id="cc-end-display">—</div>
+      </div>
+      <div>
+        <label for="cc-rate">일일 비용 (원)</label>
+        <input type="text" inputmode="numeric" class="money" id="cc-rate" value="16,500">
+      </div>
+      <div>
+        <label for="cc-month">한 달 비용 (원)</label>
+        <input type="text" inputmode="numeric" class="money" id="cc-month" value="330,000">
+      </div>
+    </div>
+    <div class="basis" id="cc-basis"></div>
+    <div class="breakdown">
+      <p id="cc-detail1">일할: —</p>
+      <p id="cc-detail2"></p>
+      <div class="sum-row">
+        <span class="label">콜센터 합계</span>
+        <span class="value" id="cc-total">—</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>로열티</h2>
+    <p class="sub">오픈일 ~ 전월 15일까지 전 일수 일할 + 한 달 로열티(16일~익월 15일), 1의 자리 버림</p>
+    <div class="grid">
+      <div>
+        <label for="ro-start">오픈일 (YY-MM-DD)</label>
+        <input type="text" class="date" id="ro-start" value="26-07-07" placeholder="26-07-07">
+      </div>
+      <div>
+        <label>정산 마감일 (자동)</label>
+        <div class="readonly" id="ro-end-display">—</div>
+      </div>
+      <div>
+        <label for="ro-rate">일일 비용 (원)</label>
+        <input type="text" inputmode="numeric" class="money" id="ro-rate" value="13,567">
+      </div>
+      <div>
+        <label for="ro-month">한 달 로열티 (원)</label>
+        <input type="text" inputmode="numeric" class="money" id="ro-month" value="407,000">
+      </div>
+    </div>
+    <div class="basis" id="ro-basis"></div>
+    <div class="breakdown">
+      <p id="ro-detail1">일할: —</p>
+      <p id="ro-detail2"></p>
+      <div class="sum-row">
+        <span class="label">로열티 합계</span>
+        <span class="value" id="ro-total">—</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card total-card">
+    <span class="label" id="total-label">총 비용</span>
+    <span class="value" id="grand-total">—</span>
+  </div>
+
+  <details>
+    <summary>공휴일 목록 편집 (콜센터 일할 계산에서 제외되는 날, 한 줄에 하나)</summary>
+    <textarea id="holidays" rows="10">2026-01-01
+2026-02-16
+2026-02-17
+2026-02-18
+2026-03-01
+2026-03-02
+2026-05-05
+2026-05-24
+2026-05-25
+2026-06-03
+2026-06-06
+2026-08-15
+2026-08-17
+2026-09-24
+2026-09-25
+2026-09-26
+2026-10-03
+2026-10-05
+2026-10-09
+2026-12-25</textarea>
+    <p class="hint">2026년 공휴일 + 대체공휴일 기준. 다른 연도 계산 시 해당 연도 공휴일을 추가하세요.</p>
+  </details>
+
+  <p class="err" id="err"></p>
+
+  <footer>무인화연구소 · CMS 정산 계산기</footer>
+</div>
+
+<script>
+function parseYY(s) {
+  var m = (s || '').trim().match(/^(\d{2})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  var d = new Date(2000 + +m[1], +m[2] - 1, +m[3]);
+  if (d.getMonth() !== +m[2] - 1 || d.getDate() !== +m[3]) return null;
+  return d;
+}
+function iso(d) {
+  var mm = String(d.getMonth() + 1).padStart(2, '0');
+  var dd = String(d.getDate()).padStart(2, '0');
+  return d.getFullYear() + '-' + mm + '-' + dd;
+}
+function fmt(n) { return n.toLocaleString('ko-KR') + '원'; }
+function num(id) {
+  var v = document.getElementById(id).value.replace(/[^0-9]/g, '');
+  return v ? parseInt(v, 10) : 0;
+}
+function floorOnes(n) { return Math.floor(n / 10) * 10; }
+function cutoffOf(endDate) { return new Date(endDate.getFullYear(), endDate.getMonth() - 1, 15); }
+function endOf(startDate) {
+  var plus = startDate.getDate() <= 15 ? 1 : 2;
+  return new Date(startDate.getFullYear(), startDate.getMonth() + plus, 15);
+}
+
+function attachMoney(el) {
+  el.addEventListener('input', function() {
+    var digits = el.value.replace(/[^0-9]/g, '');
+    var formatted = digits ? parseInt(digits, 10).toLocaleString('ko-KR') : '';
+    if (el.value !== formatted) {
+      var fromEnd = el.value.length - el.selectionStart;
+      el.value = formatted;
+      var pos = Math.max(0, formatted.length - fromEnd);
+      el.setSelectionRange(pos, pos);
+    }
+    calc();
+  });
+}
+
+function calc() {
+  var err = document.getElementById('err');
+  err.style.display = 'none';
+  var msgs = [];
+
+  var storeName = document.getElementById('store-name').value.trim();
+  var fullName = storeName ? '앤딩스터디카페 ' + storeName + '점' : '';
+  document.getElementById('total-label').textContent = fullName ? fullName + ' 총 비용' : '총 비용';
+  document.title = fullName ? fullName + ' CMS 비용 계산기' : 'CMS 비용 계산기';
+
+  var holidaySet = {};
+  document.getElementById('holidays').value.split('\n').forEach(function(line) {
+    var t = line.trim();
+    if (t) holidaySet[t] = true;
+  });
+
+  var ccS = parseYY(document.getElementById('cc-start').value);
+  var ccE = ccS ? endOf(ccS) : null;
+  document.getElementById('cc-end-display').textContent = ccE ? iso(ccE).slice(2) : '—';
+  var ccRate = num('cc-rate');
+  var ccMonth = num('cc-month');
+  var ccTotal = 0;
+
+  var ccCalc = ccMonth / 20;
+  var ccBasis = '일일 비용 산출 근거: 한 달 비용 ' + fmt(ccMonth) + ' ÷ 월 평균 영업일 20일 = ' + Math.round(ccCalc).toLocaleString('ko-KR') + '원';
+  if (Math.round(ccCalc) !== ccRate) ccBasis += ' (입력값 ' + ccRate.toLocaleString('ko-KR') + '원과 다름 — 확인 필요)';
+  document.getElementById('cc-basis').textContent = ccBasis;
+
+  var roMonthVal = num('ro-month');
+  var roRateVal = num('ro-rate');
+  var roCalc = roMonthVal / 30;
+  var roBasis = '일일 비용 산출 근거: 한 달 로열티 ' + fmt(roMonthVal) + ' ÷ 30일 = ' + roCalc.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '원 → 반올림 ' + Math.round(roCalc).toLocaleString('ko-KR') + '원';
+  if (Math.round(roCalc) !== roRateVal) roBasis += ' (입력값 ' + roRateVal.toLocaleString('ko-KR') + '원과 다름 — 확인 필요)';
+  document.getElementById('ro-basis').textContent = roBasis;
+
+  if (ccS && ccE) {
+    var cut = cutoffOf(ccE);
+    var dEnd = cut < ccS ? null : (cut > ccE ? ccE : cut);
+    var ccDays = 0;
+    if (dEnd) {
+      var d = new Date(ccS);
+      while (d <= dEnd) {
+        var dow = d.getDay();
+        if (dow !== 0 && dow !== 6 && !holidaySet[iso(d)]) ccDays++;
+        d.setDate(d.getDate() + 1);
+      }
+    }
+    var ccDailyRaw = ccDays * ccRate;
+    var ccDaily = Math.min(ccDailyRaw, ccMonth);
+    ccTotal = ccDaily + ccMonth;
+    if (ccDays > 0) {
+      var line = '일할: ' + iso(ccS).slice(2) + ' ~ ' + iso(dEnd).slice(2) + ' 영업일 ' + ccDays + '일 × ' + ccRate.toLocaleString('ko-KR') + '원 = ' + fmt(ccDailyRaw);
+      if (ccDailyRaw > ccMonth) line += ' → 한 달 비용 초과로 ' + fmt(ccMonth) + ' 상한 적용';
+      document.getElementById('cc-detail1').textContent = line;
+    } else {
+      document.getElementById('cc-detail1').textContent = '일할 구간 없음 (이용 시작일이 전월 15일 이후)';
+    }
+    document.getElementById('cc-detail2').textContent = '한 달 비용: ' + fmt(ccMonth);
+    document.getElementById('cc-total').textContent = fmt(ccTotal);
+  } else {
+    document.getElementById('cc-detail1').textContent = '—';
+    document.getElementById('cc-detail2').textContent = '';
+    document.getElementById('cc-total').textContent = '—';
+    msgs.push('콜센터 이용 시작일을 YY-MM-DD 형식으로 확인해 주세요.');
+  }
+
+  var roS = parseYY(document.getElementById('ro-start').value);
+  var roE = roS ? endOf(roS) : null;
+  document.getElementById('ro-end-display').textContent = roE ? iso(roE).slice(2) : '—';
+  var roTotal = 0;
+  if (roS && roE) {
+    var cut2 = cutoffOf(roE);
+    var dEnd2 = cut2 < roS ? null : (cut2 > roE ? roE : cut2);
+    var days = 0;
+    if (dEnd2) days = Math.round((dEnd2 - roS) / 86400000) + 1;
+    var dailySum = days * roRateVal;
+    var raw = dailySum + roMonthVal;
+    roTotal = floorOnes(raw);
+    if (days > 0) {
+      document.getElementById('ro-detail1').textContent = '일할: ' + iso(roS).slice(2) + ' ~ ' + iso(dEnd2).slice(2) + ' (' + days + '일) × ' + roRateVal.toLocaleString('ko-KR') + '원 = ' + fmt(dailySum);
+    } else {
+      document.getElementById('ro-detail1').textContent = '일할 구간 없음 (오픈일이 전월 15일 이후)';
+    }
+    document.getElementById('ro-detail2').textContent = '한 달 로열티: ' + fmt(roMonthVal) + ' → 합계 ' + fmt(raw) + ' (1의 자리 버림)';
+    document.getElementById('ro-total').textContent = fmt(roTotal);
+  } else {
+    document.getElementById('ro-detail1').textContent = '—';
+    document.getElementById('ro-detail2').textContent = '';
+    document.getElementById('ro-total').textContent = '—';
+    msgs.push('로열티 오픈일을 YY-MM-DD 형식으로 확인해 주세요.');
+  }
+
+  document.getElementById('grand-total').textContent = (ccTotal || roTotal) ? fmt(ccTotal + roTotal) : '—';
+  if (msgs.length) { err.textContent = msgs.join(' '); err.style.display = 'block'; }
+}
+
+document.querySelectorAll('.money').forEach(attachMoney);
+
+['store-name','cc-start','ro-start','holidays'].forEach(function(id) {
+  document.getElementById(id).addEventListener('input', calc);
+});
+calc();
+</script>
+</body>
+</html>
