@@ -44,6 +44,17 @@
   }
   input:focus, textarea:focus { outline: none; border-color: #2f6fde; box-shadow: 0 0 0 3px rgba(47,111,222,0.12); }
   input.date { text-align: center; }
+  select {
+    width: 100%;
+    border: 1px solid #d6d4cc;
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 15px;
+    font-family: inherit;
+    background: #fdfdfc;
+  }
+  select:focus { outline: none; border-color: #2f6fde; box-shadow: 0 0 0 3px rgba(47,111,222,0.12); }
+  input:disabled { background: #eceae4; color: #b3b0a7; cursor: not-allowed; }
   .readonly {
     width: 100%;
     border: 1px dashed #d6d4cc;
@@ -98,7 +109,7 @@
 <div class="wrap">
   <header>
     <h1>CMS 비용 계산기</h1>
-    <p>이용 시작일(오픈일)만 입력하면 정산 마감일이 자동 결정됩니다. 15일 이하 오픈은 다음 달 15일, 16일 이후 오픈은 다다음 달 15일 기준.</p>
+    <p>콜센터: 이용 시작일만 입력하면 정산 마감일 자동 결정 (15일 이하 오픈 → 다음 달 15일, 16일 이후 → 다다음 달 15일) · 로열티: 오픈일 입력 후 구간별 매출액을 넣으면 4% 자동 계산</p>
   </header>
 
   <div class="card">
@@ -148,29 +159,33 @@
 
   <div class="card">
     <h2>로열티</h2>
-    <p class="sub">오픈일 ~ 전월 15일까지 전 일수 일할 + 한 달 로열티(16일~익월 15일), 1의 자리 버림</p>
+    <p class="sub">매출액의 4% (고정) · 첫 정산은 오픈월 + 다음 달 두 달, 이후 정기 정산은 한 달씩</p>
     <div class="grid">
       <div>
         <label for="ro-start">오픈일 (YY-MM-DD)</label>
         <input type="text" class="date" id="ro-start" value="26-07-07" placeholder="26-07-07">
       </div>
       <div>
-        <label>정산 마감일 (자동)</label>
-        <div class="readonly" id="ro-end-display">—</div>
+        <label for="ro-type">정산 유형</label>
+        <select id="ro-type">
+          <option value="first" selected>첫 정산 (오픈월 + 다음 달)</option>
+          <option value="regular">정기 정산 (한 달)</option>
+        </select>
       </div>
       <div>
-        <label for="ro-rate">일일 비용 (원)</label>
-        <input type="text" inputmode="numeric" class="money" id="ro-rate" value="13,567">
+        <label id="ro-sales1-label" for="ro-sales1">1구간 매출액 (원)</label>
+        <input type="text" inputmode="numeric" class="money" id="ro-sales1" value="" placeholder="매출액 입력">
       </div>
       <div>
-        <label for="ro-month">한 달 로열티 (원)</label>
-        <input type="text" inputmode="numeric" class="money" id="ro-month" value="407,000">
+        <label id="ro-sales2-label" for="ro-sales2">2구간 매출액 (원)</label>
+        <input type="text" inputmode="numeric" class="money" id="ro-sales2" value="" placeholder="매출액 입력">
       </div>
     </div>
-    <div class="basis" id="ro-basis"></div>
+    <div class="basis" id="ro-basis">로열티 산출 방식: 월 매출액 × 4% (원 미만 버림) 합산 후 1의 자리 버림</div>
     <div class="breakdown">
-      <p id="ro-detail1">일할: —</p>
-      <p id="ro-detail2"></p>
+      <p id="ro-detail1">1구간: —</p>
+      <p id="ro-detail2">2구간: —</p>
+      <p id="ro-detail3"></p>
       <div class="sum-row">
         <span class="label">로열티 합계</span>
         <span class="value" id="ro-total">—</span>
@@ -280,13 +295,6 @@ function calc() {
   if (Math.round(ccCalc) !== ccRate) ccBasis += ' (입력값 ' + ccRate.toLocaleString('ko-KR') + '원과 다름 — 확인 필요)';
   document.getElementById('cc-basis').textContent = ccBasis;
 
-  var roMonthVal = num('ro-month');
-  var roRateVal = num('ro-rate');
-  var roCalc = roMonthVal / 30;
-  var roBasis = '일일 비용 산출 근거: 한 달 로열티 ' + fmt(roMonthVal) + ' ÷ 30일 = ' + roCalc.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '원 → 반올림 ' + Math.round(roCalc).toLocaleString('ko-KR') + '원';
-  if (Math.round(roCalc) !== roRateVal) roBasis += ' (입력값 ' + roRateVal.toLocaleString('ko-KR') + '원과 다름 — 확인 필요)';
-  document.getElementById('ro-basis').textContent = roBasis;
-
   if (ccS && ccE) {
     var cut = cutoffOf(ccE);
     var dEnd = cut < ccS ? null : (cut > ccE ? ccE : cut);
@@ -318,28 +326,46 @@ function calc() {
     msgs.push('콜센터 이용 시작일을 YY-MM-DD 형식으로 확인해 주세요.');
   }
 
+  var ROYALTY_RATE = 4;
+  document.getElementById('ro-basis').textContent = '로열티 산출 방식: 월 매출액 × ' + ROYALTY_RATE + '% (원 미만 버림) 합산 후 1의 자리 버림';
+
   var roS = parseYY(document.getElementById('ro-start').value);
-  var roE = roS ? endOf(roS) : null;
-  document.getElementById('ro-end-display').textContent = roE ? iso(roE).slice(2) : '—';
+  var roFirst = document.getElementById('ro-type').value === 'first';
+  var sales2El = document.getElementById('ro-sales2');
+  sales2El.disabled = !roFirst;
   var roTotal = 0;
-  if (roS && roE) {
-    var cut2 = cutoffOf(roE);
-    var dEnd2 = cut2 < roS ? null : (cut2 > roE ? roE : cut2);
-    var days = 0;
-    if (dEnd2) days = Math.round((dEnd2 - roS) / 86400000) + 1;
-    var dailySum = days * roRateVal;
-    var raw = dailySum + roMonthVal;
+  if (roS) {
+    var ym1 = iso(roS).slice(2, 7);
+    var m2 = new Date(roS.getFullYear(), roS.getMonth() + 1, 1);
+    var ym2 = iso(m2).slice(2, 7);
+    document.getElementById('ro-sales1-label').textContent = ym1 + ' 매출액 (원)';
+    document.getElementById('ro-sales2-label').textContent = roFirst ? ym2 + ' 매출액 (원)' : '— (정기 정산은 한 달만)';
+
+    var sales1 = num('ro-sales1');
+    var sales2 = roFirst ? num('ro-sales2') : 0;
+    var roy1 = Math.floor(sales1 * ROYALTY_RATE / 100);
+    var roy2 = Math.floor(sales2 * ROYALTY_RATE / 100);
+    var raw = roy1 + roy2;
     roTotal = floorOnes(raw);
-    if (days > 0) {
-      document.getElementById('ro-detail1').textContent = '일할: ' + iso(roS).slice(2) + ' ~ ' + iso(dEnd2).slice(2) + ' (' + days + '일) × ' + roRateVal.toLocaleString('ko-KR') + '원 = ' + fmt(dailySum);
+
+    document.getElementById('ro-detail1').textContent = ym1 + ': 매출 ' + fmt(sales1) + ' × ' + ROYALTY_RATE + '% = ' + fmt(roy1);
+    if (roFirst) {
+      document.getElementById('ro-detail2').textContent = ym2 + ': 매출 ' + fmt(sales2) + ' × ' + ROYALTY_RATE + '% = ' + fmt(roy2);
+      document.getElementById('ro-detail3').textContent = '합계 ' + fmt(raw) + ' → 1의 자리 버림';
     } else {
-      document.getElementById('ro-detail1').textContent = '일할 구간 없음 (오픈일이 전월 15일 이후)';
+      document.getElementById('ro-detail2').textContent = '';
+      document.getElementById('ro-detail3').textContent = '1의 자리 버림 적용';
     }
-    document.getElementById('ro-detail2').textContent = '한 달 로열티: ' + fmt(roMonthVal) + ' → 합계 ' + fmt(raw) + ' (1의 자리 버림)';
     document.getElementById('ro-total').textContent = fmt(roTotal);
+    if (sales1 === 0 && sales2 === 0) {
+      document.getElementById('ro-detail3').textContent = '매출액을 입력하면 로열티가 계산됩니다.';
+    }
   } else {
-    document.getElementById('ro-detail1').textContent = '—';
-    document.getElementById('ro-detail2').textContent = '';
+    document.getElementById('ro-sales1-label').textContent = '1구간 매출액 (원)';
+    document.getElementById('ro-sales2-label').textContent = '2구간 매출액 (원)';
+    document.getElementById('ro-detail1').textContent = '1구간: —';
+    document.getElementById('ro-detail2').textContent = '2구간: —';
+    document.getElementById('ro-detail3').textContent = '';
     document.getElementById('ro-total').textContent = '—';
     msgs.push('로열티 오픈일을 YY-MM-DD 형식으로 확인해 주세요.');
   }
@@ -353,6 +379,7 @@ document.querySelectorAll('.money').forEach(attachMoney);
 ['store-name','cc-start','ro-start','holidays'].forEach(function(id) {
   document.getElementById(id).addEventListener('input', calc);
 });
+document.getElementById('ro-type').addEventListener('change', calc);
 calc();
 </script>
 </body>
